@@ -21,7 +21,10 @@ int main(int argc, char* argv[]) {
 
 	bool endianType = (su::cur_byte_order() == su::byte_order::little_endian);
 	std::cerr << "Your processor has a " << (endianType ? "little" : "big") << " pipi\n";
-	
+	if (!endianType) {
+		std::cerr << "Big pipi is not allowed";
+		exit(1);
+	}
 	try {
 		const char* f1 = argv[1];
 
@@ -29,13 +32,13 @@ int main(int argc, char* argv[]) {
 		{
 		case 2: {
 			unique_ptr<File> f{ new File(argv[1], endianType) };
-			
+
 			f->readMessage();
 			break;
 		}
-			case 3: {			
-				unique_ptr<File> f{ new File(argv[1], endianType, argv[2]) };
-				f->copyFile();
+		case 3: {
+			unique_ptr<File> f{ new File(argv[1], endianType, argv[2]) };
+			f->writeMessage();
 			break;
 		}
 		}
@@ -46,6 +49,6 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	
+
 	return 0;
 }

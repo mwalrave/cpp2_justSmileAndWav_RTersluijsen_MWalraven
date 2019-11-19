@@ -28,8 +28,6 @@ File::File(string pFileName, bool pLittleEndian, std::string pMessage) : File(pF
 {
 	message = pMessage;
 	cerr << "Imprint Message: " << message << endl;
-
-
 }
 
 bool File::fileExists(const std::string& fileName) {
@@ -95,9 +93,15 @@ void File::setFileInfo()
 		}
 
 		ifs.close();
-		
+
 		if (bitsPerSample < 16) {
 			cerr << "File is less than 16 bits per sample, this is no gucci" << endl;
+
+			exit(1);
+		}
+
+		if (bitsPerSample > 16) {
+			cerr << "File is more than 16 bits per sample, this is no gucci" << endl;
 
 			exit(1);
 		}
@@ -117,25 +121,18 @@ void File::setFileInfo()
 
 }
 
-void File::getFileInfo()
-{
-
-}
-
 void File::readMessage()
 {
 
 	std::ifstream ifs(fileName, std::ifstream::binary);
 	ifs.seekg(dataPosition);
-	std::vector<short> storage(size);
+	std::vector<short> samples(size);
 	for (int i = 0; i < numberOfSamples; i++) {
 
-		ifs.read((char*)& storage[i], bytesPerSample);
+		ifs.read((char*)& samples[i], bytesPerSample);
 
 
 	}
-
-
 	std::vector<bitset<8>> hiddenMessageBytes(numberOfSamples);
 	std::bitset<8> hiddenCharacterByte;
 	int j = 7;
@@ -143,7 +140,7 @@ void File::readMessage()
 	for (int i = 0; i < numberOfSamples; i++) {
 
 
-		int lsb = storage[i] & 1;
+		int lsb = samples[i] & 1;
 		hiddenCharacterByte.set(j, lsb);
 
 		if (j > 0) {
@@ -163,7 +160,7 @@ void File::readMessage()
 	ifs.close();
 }
 
-void File::copyFile()
+void File::writeMessage()
 {
 	string newFileName = "output" + fileName;
 	message += '\0';
@@ -178,12 +175,12 @@ void File::copyFile()
 
 	std::vector<char> output(size);
 
-	std::vector<short> storage(1 + messageLength * 8);
+	std::vector<short> samples(1 + messageLength * 8);
 
 	src.read(output.data(), dataPosition);
 
 	for (int i = 0; i < messageLength * 8; i++) {
-		src.read((char*)& storage[i], 2);
+		src.read((char*)& samples[i], 2);
 	}
 
 	std::vector<bitset<8>> messageBitsets(messageLength);
@@ -195,52 +192,40 @@ void File::copyFile()
 	int counter = 0;
 	for (int i = 0; i < messageLength; i++) {
 		for (int j = 7; j >= 0; j--) {
-			int lsb = storage[counter] & 1;
+			int lsb = samples[counter] & 1;
 			if (lsb != messageBitsets[i][j]) {
-			
-				storage[counter] ^= 1 << 0;
-
+				samples[counter] ^= 1 << 0;
 			}
-
-
-
 			counter++;
-
 		}
 
 	}
-	
+
 
 	long streamPos = dataPosition;
 	for (int i = 0; i < messageLength * 8; i++) {
-
-		short value = storage[i];
+		short value = samples[i];
 
 		output[streamPos] = value;
 		value = value >> 8;
 
 		output[streamPos + 1] = value;
 		streamPos += 2;
-
 	}
 	src.seekg(streamPos);
-
-
 
 	vector<char> newBuffer(size - streamPos);
 	src.read(newBuffer.data(), size - streamPos);
 
+	src.close();
 
 	for (int i = 0; i < size - streamPos; i++) {
-	
 		output.at((i + streamPos)) = newBuffer[i];
 	}
-
 
 	std::ofstream  dst(newFileName, std::ios::binary);
 	dst.write(output.data(), size);
 
-	src.close();
 	dst.close();
 
 }
@@ -260,10 +245,6 @@ int File::toInt(std::vector<char> chunkSize)
 		for (unsigned n = 0; n < sizeof(size); n++)
 			size = (size << 8) + chunkSize[n];
 	return size;
-}
-
-void File::setMessage(std::string message)
-{
 }
 
 

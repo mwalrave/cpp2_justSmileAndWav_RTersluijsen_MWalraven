@@ -10,9 +10,8 @@ public:
 	File(std::string pFileName, bool pLittleEndian, std::string message);
 	bool fileExists(const std::string& fileName);
 	void setFileInfo();
-	void getFileInfo();
 	void readMessage();
-	void copyFile();
+	void writeMessage();
 	int toInt(std::vector<char> chunkSize);
 
 	//Vars
@@ -26,5 +25,4 @@ public:
 	int numberOfSamples;
 	int dataPosition;
 	int size;
-	void setMessage(std::string message);
 };

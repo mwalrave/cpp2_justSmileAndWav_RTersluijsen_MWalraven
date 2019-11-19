@@ -5,7 +5,7 @@ using namespace std;
 
 
 
-File::File() 
+File::File()
 {
 }
 
@@ -20,11 +20,11 @@ File::File(string pFileName, bool pLittleEndian) : fileName(pFileName), littleEn
 
 }
 
-File::File(string pFileName, bool pLittleEndian,  std::string pMessage): File(pFileName, pLittleEndian)
+File::File(string pFileName, bool pLittleEndian, std::string pMessage) : File(pFileName, pLittleEndian)
 {
 	message = pMessage;
 	cout << "Imprint Message: " << message << endl;
-	
+
 
 }
 
@@ -92,16 +92,22 @@ void File::setFileInfo()
 		}
 
 		ifs.close();
+		
+		if (bitsPerSample < 16) {
+			cout << "File is less than 16 bits per sample, this is no gucci" << endl;
+
+			exit(1);
+		}
 
 		bytesPerSample = bitsPerSample / 8;
 		numberOfSamples = size / bytesPerSample;
-		
+
 		cout << buffer.data() << " Data" << endl;
 		cout << size << " Data size" << endl;
 		cout << bitsPerSample << " Bits per sample" << endl;
-		
+
 		cout << numberOfSamples << " numberOfSamples " << endl << endl;
-		
+
 
 	}
 
@@ -118,6 +124,7 @@ void File::readMessage()
 
 	std::ifstream ifs(fileName, std::ifstream::binary);
 	ifs.seekg(dataPosition);
+	//cout << ifs.tellg() << endl;
 	std::vector<short> storage(size);
 	for (int i = 0; i < numberOfSamples; i++) {
 
@@ -144,8 +151,9 @@ void File::readMessage()
 		}
 		else {
 			j = 7;
+			cout << " ";
 			if (hiddenCharacterByte.none()) {
-				break;
+				//break;
 			};
 			hiddenMessageBytes[i] = hiddenCharacterByte;
 			cout << (char)hiddenCharacterByte.to_ulong();
@@ -158,84 +166,99 @@ void File::readMessage()
 
 void File::copyFile()
 {
-		string newFileName = "output" + fileName;
-		int messageLength = message.length();
+	string newFileName = "output" + fileName;
+	int messageLength = message.length();
 
-		std::ifstream  src(fileName, std::ios::binary);
+	std::ifstream  src(fileName, std::ios::binary);
 
-		src.seekg(0, src.end);
-		long size = src.tellg();
-		src.seekg(0, src.beg);
-
-
-		std::vector<char> output(size);
-
-		std::vector<short> storage(1 + messageLength * 8);
-
-		src.read(output.data(), dataPosition);
-
-		for (int i = 0; i < messageLength * 8; i++) {
-			src.read((char*)& storage[i], 2);
-		}
-	
-
-		std::vector<bitset<8>> messageBitsets(messageLength);
-
-		for (int i = 0; i < messageLength; i++) {
-			messageBitsets[i] = bitset<8>(message.c_str()[i]);
-			cout << messageBitsets[i] << " ";
-		}
-		cout << endl;
-		int counter = 0;
-		for (int i = 0; i < messageLength; i++) {
-			for (int j = 7; j >= 0; j--) {
-				int lsb = storage[counter] & 1;
-				if (lsb != messageBitsets[i][j]) {
-
-					storage[counter] ^= 1 << 0;
-
-				}
+	src.seekg(0, src.end);
+	long size = src.tellg();
+	src.seekg(0, src.beg);
 
 
+	std::vector<char> output(size);
 
-				counter++;
+	std::vector<short> storage(1 + messageLength * 8);
+
+	src.read(output.data(), dataPosition);
+	cout << src.tellg() << endl;
+
+	for (int i = 0; i < messageLength * 8; i++) {
+		src.read((char*)& storage[i], 2);
+	}
+
+	std::vector<bitset<8>> messageBitsets(messageLength);
+
+	for (int i = 0; i < messageLength; i++) {
+		messageBitsets[i] = bitset<8>(message.c_str()[i]);
+		cout << (char)messageBitsets[i].to_ulong() << " ";
+	}
+	cout << endl;
+
+	int counter = 0;
+	for (int i = 0; i < messageLength; i++) {
+		for (int j = 7; j >= 0; j--) {
+			int lsb = storage[counter] & 1;
+			if (lsb != messageBitsets[i][j]) {
+				// 0 = byte 1
+				// 8 = byte 2
+				storage[counter] ^= 1 << 0;
+				//(storage[counter] & 1) ^ (1 <<0);
 
 			}
-		
-		}	
+
+			cout << (storage[counter] & 1);
 
 
-		long streamPos = dataPosition;
-		for (int i = 0; i < messageLength * 8; i++) {
-			cout << (char)storage[i] << " Char " << endl;
-			//short value = storage[i];
+			counter++;
 
-			//output[streamPos + 1] = value;
-			//value = value >> 8;
-			//output[streamPos ] = value;
-			//streamPos += 2;
-
-			memcpy(&output[streamPos], &storage[i], 2);
 		}
-		streamPos = src.tellg();
-		vector<char> newBuffer(size - streamPos);
-		src.read(newBuffer.data(), size);
+		cout << " ";
+
+	}
+	// NULLBYTE INVOEGEN!!!
+	
+
+	long streamPos = dataPosition;
+	for (int i = 0; i < messageLength * 8; i++) {
+
+		//cout << (char)storage[i] << " Char 1 " << endl;
+		short value = storage[i];
+
+		output[streamPos] = value;
+		value = value >> 8;
+		//cout << (char)value << " Char 2 " << endl;
+
+		output[streamPos + 1] = value;
+		streamPos += 2;
+
+		//	cout << ((output[streamPos ]>> 0) & 1);
+			//streamPos = streamPos + 2;
+	}
+	//streamPos = src.tellg();
+	src.seekg(streamPos);
 
 
-		cout << dataPosition << endl;
 
-		cout << streamPos << endl;
-		for (int i = 0; i < size - streamPos; i++) {
-			output.at((i + streamPos)) = newBuffer[i];
-		}
+	vector<char> newBuffer(size - streamPos);
+	src.read(newBuffer.data(), size - streamPos);
 
 
-		std::ofstream  dst(newFileName, std::ios::binary);
-		dst.write(output.data(), size);
+	cout << dataPosition << endl;
 
-		//dst << src.rdbuf();
-		src.close();
-		dst.close();
+	cout << streamPos << endl;
+	for (int i = 0; i < size - streamPos; i++) {
+		// MAYBE I + 1 ????
+		output.at((i + streamPos)) = newBuffer[i];
+	}
+
+
+	std::ofstream  dst(newFileName, std::ios::binary);
+	dst.write(output.data(), size);
+
+	//dst << src.rdbuf();
+	src.close();
+	dst.close();
 
 }
 

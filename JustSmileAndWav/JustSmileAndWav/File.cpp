@@ -1,6 +1,10 @@
 #include "File.h"
 #include <fstream>
 #include <bitset>
+#include "DebugNew.h"
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
 using namespace std;
 
 
@@ -13,7 +17,7 @@ File::File()
 File::File(string pFileName, bool pLittleEndian) : fileName(pFileName), littleEndian(pLittleEndian)
 {
 	if (!fileExists(fileName)) {
-		cout << "!File doesnt exist, shame on you!" << endl;
+		cerr << "!File doesnt exist, shame on you!" << endl;
 		exit(0);
 	};
 	setFileInfo();
@@ -23,7 +27,7 @@ File::File(string pFileName, bool pLittleEndian) : fileName(pFileName), littleEn
 File::File(string pFileName, bool pLittleEndian, std::string pMessage) : File(pFileName, pLittleEndian)
 {
 	message = pMessage;
-	cout << "Imprint Message: " << message << endl;
+	cerr << "Imprint Message: " << message << endl;
 
 
 }
@@ -37,7 +41,6 @@ bool File::fileExists(const std::string& fileName) {
 	return exists;
 }
 
-// Misschien wat opdelen?
 void File::setFileInfo()
 {
 
@@ -54,10 +57,10 @@ void File::setFileInfo()
 
 		extension = buffer.data();
 		if (extension == "WAVE") {
-			cout << "File accepted, very wave" << endl;
+			cerr << "File accepted, very wave" << endl;
 		}
 		else {
-			cout << "File is pretty wrong, this is no wave??? " << endl;
+			cerr << "File is pretty wrong, this is no wave??? " << endl;
 
 			ifs.close();
 			exit(1);
@@ -94,7 +97,7 @@ void File::setFileInfo()
 		ifs.close();
 		
 		if (bitsPerSample < 16) {
-			cout << "File is less than 16 bits per sample, this is no gucci" << endl;
+			cerr << "File is less than 16 bits per sample, this is no gucci" << endl;
 
 			exit(1);
 		}
@@ -102,11 +105,11 @@ void File::setFileInfo()
 		bytesPerSample = bitsPerSample / 8;
 		numberOfSamples = size / bytesPerSample;
 
-		cout << buffer.data() << " Data" << endl;
-		cout << size << " Data size" << endl;
-		cout << bitsPerSample << " Bits per sample" << endl;
+		cerr << buffer.data() << " Data" << endl;
+		cerr << size << " Data size" << endl;
+		cerr << bitsPerSample << " Bits per sample" << endl;
 
-		cout << numberOfSamples << " numberOfSamples " << endl << endl;
+		cerr << numberOfSamples << " Number of samples " << endl << endl;
 
 
 	}
@@ -124,7 +127,6 @@ void File::readMessage()
 
 	std::ifstream ifs(fileName, std::ifstream::binary);
 	ifs.seekg(dataPosition);
-	//cout << ifs.tellg() << endl;
 	std::vector<short> storage(size);
 	for (int i = 0; i < numberOfSamples; i++) {
 
@@ -142,31 +144,29 @@ void File::readMessage()
 
 
 		int lsb = storage[i] & 1;
-		//cout << storage[i] << endl;
 		hiddenCharacterByte.set(j, lsb);
 
-		//cout << lsb << "";
 		if (j > 0) {
 			j--;
 		}
 		else {
 			j = 7;
-			cout << " ";
 			if (hiddenCharacterByte.none()) {
-				//break;
+				break;
 			};
 			hiddenMessageBytes[i] = hiddenCharacterByte;
 			cout << (char)hiddenCharacterByte.to_ulong();
 
 		}
 	}
-	cout << " " << endl;
+
 	ifs.close();
 }
 
 void File::copyFile()
 {
 	string newFileName = "output" + fileName;
+	message += '\0';
 	int messageLength = message.length();
 
 	std::ifstream  src(fileName, std::ios::binary);
@@ -181,7 +181,6 @@ void File::copyFile()
 	std::vector<short> storage(1 + messageLength * 8);
 
 	src.read(output.data(), dataPosition);
-	cout << src.tellg() << endl;
 
 	for (int i = 0; i < messageLength * 8; i++) {
 		src.read((char*)& storage[i], 2);
@@ -191,51 +190,39 @@ void File::copyFile()
 
 	for (int i = 0; i < messageLength; i++) {
 		messageBitsets[i] = bitset<8>(message.c_str()[i]);
-		cout << (char)messageBitsets[i].to_ulong() << " ";
 	}
-	cout << endl;
 
 	int counter = 0;
 	for (int i = 0; i < messageLength; i++) {
 		for (int j = 7; j >= 0; j--) {
 			int lsb = storage[counter] & 1;
 			if (lsb != messageBitsets[i][j]) {
-				// 0 = byte 1
-				// 8 = byte 2
+			
 				storage[counter] ^= 1 << 0;
-				//(storage[counter] & 1) ^ (1 <<0);
 
 			}
 
-			cout << (storage[counter] & 1);
 
 
 			counter++;
 
 		}
-		cout << " ";
 
 	}
-	// NULLBYTE INVOEGEN!!!
 	
 
 	long streamPos = dataPosition;
 	for (int i = 0; i < messageLength * 8; i++) {
 
-		//cout << (char)storage[i] << " Char 1 " << endl;
 		short value = storage[i];
 
 		output[streamPos] = value;
 		value = value >> 8;
-		//cout << (char)value << " Char 2 " << endl;
 
 		output[streamPos + 1] = value;
 		streamPos += 2;
 
-		//	cout << ((output[streamPos ]>> 0) & 1);
-			//streamPos = streamPos + 2;
 	}
-	//streamPos = src.tellg();
 	src.seekg(streamPos);
 
 
@@ -244,11 +231,8 @@ void File::copyFile()
 	src.read(newBuffer.data(), size - streamPos);
 
 
-	cout << dataPosition << endl;
-
-	cout << streamPos << endl;
 	for (int i = 0; i < size - streamPos; i++) {
-		// MAYBE I + 1 ????
+	
 		output.at((i + streamPos)) = newBuffer[i];
 	}
 
@@ -256,7 +240,6 @@ void File::copyFile()
 	std::ofstream  dst(newFileName, std::ios::binary);
 	dst.write(output.data(), size);
 
-	//dst << src.rdbuf();
 	src.close();
 	dst.close();
 

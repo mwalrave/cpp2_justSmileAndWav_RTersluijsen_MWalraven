@@ -128,6 +128,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="byte_order.h" />
+    <ClInclude Include="DebugNew.h" />
     <ClInclude Include="File.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
